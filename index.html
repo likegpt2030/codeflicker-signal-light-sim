@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeFlicker Signal Light</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #1a1a2e;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
+  overflow: hidden;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.traffic-light {
+  width: 120px;
+  padding: 22px 18px;
+  background: linear-gradient(180deg, #2c2c3c 0%, #1e1e2e 100%);
+  border-radius: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  box-shadow:
+    0 0 0 3px #333348,
+    0 0 0 6px #1a1a28,
+    0 20px 60px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.lamp {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  position: relative;
+  transition: box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+}
+
+.lamp::after {
+  content: '';
+  position: absolute;
+  top: 7px; left: 7px; right: 7px; bottom: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Off states */
+.lamp.red   { background: #3a1515; border: 2px solid #4a2020; }
+.lamp.yellow { background: #3a3a15; border: 2px solid #4a4a20; }
+.lamp.green  { background: #153a15; border: 2px solid #204a20; }
+
+/* On states — single solid glow */
+.lamp.red.on {
+  background: radial-gradient(circle at 50% 50%, #ff4444 0%, #cc0000 45%, #880000 75%, #3a1515 100%);
+  border-color: #ff6666;
+  box-shadow: 0 0 18px rgba(255,0,0,0.5), 0 0 50px rgba(255,0,0,0.2);
+}
+.lamp.yellow.on {
+  background: radial-gradient(circle at 50% 50%, #ffdd44 0%, #ccaa00 45%, #887700 75%, #3a3a15 100%);
+  border-color: #ffee66;
+  box-shadow: 0 0 18px rgba(255,200,0,0.5), 0 0 50px rgba(255,200,0,0.2);
+}
+.lamp.green.on {
+  background: radial-gradient(circle at 50% 50%, #44ff44 0%, #00cc00 45%, #008800 75%, #153a15 100%);
+  border-color: #66ff66;
+  box-shadow: 0 0 18px rgba(0,255,0,0.5), 0 0 50px rgba(0,255,0,0.2);
+}
+
+/* Animations */
+@keyframes breathe {
+  0%, 100% { opacity: 0.18; }
+  50%      { opacity: 1; }
+}
+@keyframes flash {
+  0%, 49.9% { opacity: 1; }
+  50%, 100% { opacity: 0.08; }
+}
+@keyframes flash-fast {
+  0%, 39.9% { opacity: 1; }
+  40%, 100% { opacity: 0.08; }
+}
+
+.lamp.breathe  { animation: breathe 2.2s ease-in-out infinite; }
+.lamp.flash    { animation: flash 0.7s step-end infinite; }
+.lamp.flash-fast { animation: flash-fast 0.45s step-end infinite; }
+
+/* Status panel */
+.status-panel { text-align: center; min-width: 200px; }
+.status-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #666680;
+  margin-bottom: 6px;
+}
+.status-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #e0e0f0;
+  margin-bottom: 4px;
+  min-height: 28px;
+  transition: color 0.3s;
+}
+.status-text.c-green  { color: #66ff88; }
+.status-text.c-yellow { color: #ffee66; }
+.status-text.c-red    { color: #ff6666; }
+.attention-text {
+  font-size: 13px;
+  color: #8888aa;
+  min-height: 20px;
+}
+.event-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 10px;
+  font-size: 11px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: #7777aa;
+}
+
+.pole {
+  width: 14px;
+  height: 70px;
+  background: linear-gradient(90deg, #333348, #2a2a3a, #333348);
+  border-radius: 0 0 4px 4px;
+}
+
+.conn-status {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #666680;
+}
+.conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #ff4444;
+  transition: background 0.3s;
+}
+.conn-dot.connected  { background: #44ff44; }
+.conn-dot.connecting { background: #ffdd44; animation: flash 1s step-end infinite; }
+</style>
+</head>
+<body>
+
+<div class="conn-status">
+  <span class="conn-dot" id="connDot"></span>
+  <span id="connText">未连接</span>
+</div>
+
+<div class="container">
+  <div class="traffic-light">
+    <div class="lamp red"    id="lampRed"></div>
+    <div class="lamp yellow" id="lampYellow"></div>
+    <div class="lamp green"  id="lampGreen"></div>
+  </div>
+  <div class="pole"></div>
+  <div class="status-panel">
+    <div class="status-label">CodeFlicker</div>
+    <div class="status-text" id="statusText">等待连接…</div>
+    <div class="attention-text" id="attentionText"></div>
+    <div class="event-badge" id="eventBadge"></div>
+  </div>
+</div>
+
+<script>
+const lampRed    = document.getElementById('lampRed');
+const lampYellow = document.getElementById('lampYellow');
+const lampGreen  = document.getElementById('lampGreen');
+const statusText = document.getElementById('statusText');
+const attentionText = document.getElementById('attentionText');
+const eventBadge = document.getElementById('eventBadge');
+const connDot    = document.getElementById('connDot');
+const connText   = document.getElementById('connText');
+
+function clearLamps() {
+  [lampRed, lampYellow, lampGreen].forEach(l => {
+    l.classList.remove('on', 'breathe', 'flash', 'flash-fast');
+  });
+}
+
+//  ┌────────────────┬────────────┬──────────────┬─────────────────────┐
+//  │ signal         │ red        │ yellow       │ green               │
+//  ├────────────────┼────────────┼──────────────┼─────────────────────┤
+//  │ idle           │            │              │ ● solid             │
+//  │ thinking       │            │ ● breathe    │                     │
+//  │ working        │            │ ● breathe    │                     │
+//  │ tool_done      │            │ ● breathe    │                     │
+//  │ attention      │            │ ● flash      │                     │
+//  │ permission     │            │ ● flash-fast │                     │
+//  │ blocked        │ ● flash    │              │                     │
+//  │ done           │            │              │ ● flash             │
+//  │ session_start  │            │              │ ● solid             │
+//  │ session_end    │            │              │ ● solid             │
+//  │ off            │            │              │                     │
+//  └────────────────┴────────────┴──────────────┴─────────────────────┘
+
+const COLOR_MAP = {
+  idle:          'c-green',
+  thinking:      'c-yellow',
+  working:       'c-yellow',
+  tool_done:     'c-yellow',
+  attention:     'c-yellow',
+  permission:    'c-yellow',
+  blocked:       'c-red',
+  done:          'c-green',
+  session_start: 'c-green',
+  session_end:   'c-green',
+  session_done:  'c-green',
+};
+
+function applySignal(signal) {
+  clearLamps();
+
+  switch (signal) {
+    case 'idle':
+    case 'session_start':
+    case 'session_end':
+    case 'session_done':
+      lampGreen.classList.add('on');
+      break;
+
+    case 'thinking':
+    case 'working':
+    case 'tool_done':
+      lampYellow.classList.add('on', 'breathe');
+      break;
+
+    case 'attention':
+      lampYellow.classList.add('on', 'flash');
+      break;
+
+    case 'permission':
+      lampYellow.classList.add('on', 'flash-fast');
+      break;
+
+    case 'blocked':
+      lampRed.classList.add('on', 'flash');
+      break;
+
+    case 'done':
+      lampGreen.classList.add('on', 'flash');
+      break;
+
+    default:
+      lampYellow.classList.add('on', 'flash');
+  }
+}
+
+function updateUI(data) {
+  applySignal(data.signal);
+  statusText.textContent = data.summary || data.signal;
+  statusText.className = 'status-text ' + (COLOR_MAP[data.signal] || '');
+  attentionText.textContent = data.attention || '';
+  eventBadge.textContent = data.event ? `${data.event} → ${data.signal}` : '';
+}
+
+let es = null;
+let reconnectTimer = null;
+
+function connect() {
+  connDot.className = 'conn-dot connecting';
+  connText.textContent = '连接中…';
+  es = new EventSource('/events');
+
+  es.onopen = () => {
+    connDot.className = 'conn-dot connected';
+    connText.textContent = '已连接';
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  };
+
+  es.onmessage = (e) => {
+    try { updateUI(JSON.parse(e.data)); } catch {}
+  };
+
+  es.onerror = () => {
+    connDot.className = 'conn-dot';
+    connText.textContent = '断开，重连中…';
+    if (es) { es.close(); es = null; }
+    clearLamps();
+    statusText.textContent = '等待连接…';
+    statusText.className = 'status-text';
+    attentionText.textContent = '';
+    eventBadge.textContent = '';
+    reconnectTimer = setTimeout(connect, 2000);
+  };
+}
+
+connect();
+</script>
+</body>
+</html>
