@@ -11,6 +11,7 @@ const readline = require("readline");
 const SIM_PORT = 9876;
 const LOG_DIR = path.join(process.env.HOME, ".codeflicker/cli/logs");
 const POLL_INTERVAL_MS = 400;
+const CF_PID_FILE = path.join(process.env.HOME, ".codeflicker/signal-light-sim/.cf-active");
 
 let currentSignal = "idle";
 let lastEventTime = 0;
@@ -62,6 +63,15 @@ function setSignal(signal, event, detail) {
   lastEventTime = Date.now();
   if (debounceTimer) clearTimeout(debounceTimer);
   console.log(`  ${prev} → ${signal}  (${event}: ${detail})`);
+
+  // Write/remove PID file for SignalLight app to detect cf activity
+  const activeSignals = ["thinking", "working", "tool_done", "attention", "permission", "blocked", "session_start"];
+  if (activeSignals.includes(signal)) {
+    try { fs.writeFileSync(CF_PID_FILE, Date.now().toString()); } catch {}
+  } else {
+    try { fs.unlinkSync(CF_PID_FILE); } catch {}
+  }
+
   postToSim(signal, event, detail);
 }
 
