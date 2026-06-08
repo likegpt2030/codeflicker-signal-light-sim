@@ -65,7 +65,7 @@ function setSignal(signal, event, detail) {
   console.log(`  ${prev} → ${signal}  (${event}: ${detail})`);
 
   // Write/remove PID file for SignalLight app to detect cf activity
-  const activeSignals = ["thinking", "working", "tool_done", "attention", "permission", "blocked", "session_start"];
+  const activeSignals = ["thinking", "working", "tool_done", "attention", "permission", "blocked", "session_start", "done"];
   if (activeSignals.includes(signal)) {
     try { fs.writeFileSync(CF_PID_FILE, Date.now().toString()); } catch {}
   } else {
@@ -278,6 +278,7 @@ console.log(`   Simulator:  http://127.0.0.1:${SIM_PORT}`);
 console.log(`   Poll rate:  ${POLL_INTERVAL_MS}ms`);
 
 postToSim("session_start", "WatcherStart", "log watcher started");
+// Don't write PID file here — this isn't a real cf session
 
 const pollers = [];
 if (debugExists) pollers.push(pollFile(debugLogPath, "debug"));
